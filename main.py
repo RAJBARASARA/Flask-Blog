@@ -5,7 +5,7 @@ from datetime import datetime
 import json,os,math
 
 with open('config.json','r') as c:
-    params = json.load(c)["params"]
+    params = json.load(c)["params"]  # json.loads() function is used to parse a JSON string and convert it into a Python object
 
 local_server = True
 app = Flask(__name__)
@@ -44,33 +44,26 @@ class Posts(db.Model):
 def home():
     flash("Welcome To Blog Post","info")
     # Pagination Logic
+
+    # Fetching All Posts
     posts = Posts.query.filter_by().all()  # [0:params['no_of_posts']]
 
     # Calculating total number of pages:
     last = math.ceil(len(posts)/int(params['no_of_posts']))
 
     # it’s important to get on what page user is.
-    page = request.args.get('page')
+    page = request.args.get('page',1)
 
-    if(not str(page).isnumeric()):
-        page=1  # for home page we hard code by page 1 default
-
-    # we need page as integer but “request.args.get('page')” returns string.
-    page=int(page)
+    # Ensure page is a valid integer
+    try:
+        page = int(page)
+    except ValueError:
+        page = 1  # Default to page 1 if not a valid number
 
     posts=posts[(page-1)*int(params['no_of_posts']):(page-1)*int(params['no_of_posts']) + int(params['no_of_posts'])]
-    # First page : prev=#,next=page+1
-    if(page==1):
-        prev="#"
-        nxt="/?page="+str(page+1)
-    # last page : prev=page-1,next=#
-    elif(page==last):
-        prev="/?page="+str(page-1)
-        nxt="#"
-    # Second page : prev=page-1,next=page+1
-    else:
-        prev="/?page="+str(page-1)
-        nxt="/?page="+str(page+1)
+
+    prev = f"/?page={page - 1}" if page > 1 else None
+    nxt = f"/?page={page + 1}" if page < last else None
 
     return render_template('index.html',params = params,posts=posts,prev=prev,next=nxt)
 
@@ -92,6 +85,8 @@ def edit(sno):
                 post = Posts(title=box_title, slug=box_slug, content=box_content, img_file=box_img_file, date=date)
                 db.session.add(post)
                 db.session.commit()
+                flash("New Post Add Successfully",'success')
+
             else:  # Edit existing post
                 post = Posts.query.filter_by(sno=sno).first()
                 post.title = box_title
@@ -100,19 +95,29 @@ def edit(sno):
                 post.img_file = box_img_file
                 post.date = date
                 db.session.commit()
+                flash("Post Edit Success","success")
 
             return redirect('/dashboard')  # Redirect to dashboard instead of refreshing edit page
 
     post = None if sno == '0' else Posts.query.filter_by(sno=sno).first()
     return render_template('edit.html', params=params, post=post)
 
-@app.route("/uploader",methods = ['GET','POST'])
+@app.route("/uploader", methods=['GET', 'POST'])
 def uploader():
-    if ('user' in session and session['user'] == params['admin_user']):
-        if (request.method == 'POST'):
-            f=request.files['file1']
-            f.save(os.path.join(app.config['UPLOAD_FOLDER'],secure_filename(f.filename)))
-            return "Uploaded Successfully"
+    if 'user' in session and session['user'] == params['admin_user']:
+        if request.method == 'POST':
+            f = request.files['file1']
+            if f.filename == '':
+                flash("No selected file", "danger")
+                return redirect(request.url)
+            try:
+                f.save(os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(f.filename)))
+                flash("File uploaded successfully!", "success")
+            except Exception as e:
+                flash("File upload failed!", "danger")
+            return redirect(request.url)
+
+    return redirect("/dashboard")
 
 @app.route("/dashboard",methods = ['GET','POST'])
 def dashboard():
@@ -159,11 +164,27 @@ def delete(sno):
         post = Posts.query.filter_by(sno=sno).first()
         db.session.delete(post)
         db.session.commit()
+    flash("Delete Post Success!","danger")
     return redirect('/dashboard')
 
 @app.route('/logout')
 def logout():
     session.pop('user')
     return redirect('/dashboard')
+
+
+# Make User Authentication
+
+@app.route('/register' , methods=['POST','GET'])
+def register():
+    if request.method=='POST':
+        pass
+    return render_template('register.html')
+
+@app.route('/login',methods=['GET','POST'])
+def login():
+    if request.method=='POST':
+        pass
+    return render_template('login.html')
 
 app.run(debug=True)
