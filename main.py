@@ -1,4 +1,4 @@
-from flask import Flask,render_template,request,session,redirect
+from flask import Flask,render_template,request,session,redirect,flash
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 from datetime import datetime
@@ -42,6 +42,7 @@ class Posts(db.Model):
 
 @app.route("/")
 def home():
+    flash("Welcome To Blog Post","info")
     # Pagination Logic
     posts = Posts.query.filter_by().all()  # [0:params['no_of_posts']]
 
@@ -148,6 +149,8 @@ def contact():
         entry = Contacts(name=name,email=email,ph_no=phone,msg=message,date=datetime.now())
         db.session.add(entry)
         db.session.commit()
+
+        flash("Thanks for send your details,We will get back to you soon","success")
     return render_template('contact.html',params = params)
 
 @app.route("/delete/<string:sno>",methods=['GET','POST'])
