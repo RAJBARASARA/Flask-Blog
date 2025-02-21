@@ -6,6 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
     <meta name="description" content="" />
     <meta name="author" content="" />
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
     <title>{{params['blog_name']}}</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='assets/favicon.ico')}}" />
     <!-- Font Awesome icons (free version)-->
@@ -24,7 +28,7 @@
     <!-- Navigation-->
     <nav class="navbar navbar-expand-lg navbar-light" id="mainNav">
         <div class="container px-4 px-lg-5">
-            <a class="navbar-brand" href="/">{{params['blog_name']}}</a>
+            <a class="navbar-brand" href="/">{{ params['blog_name'] }}</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarResponsive"
                 aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
                 Menu
@@ -34,15 +38,32 @@
                 <ul class="navbar-nav ms-auto py-4 py-lg-0">
                     <li class="nav-item"><a class="nav-link px-lg-3 py-3 py-lg-4" href="/">Home</a></li>
                     <li class="nav-item"><a class="nav-link px-lg-3 py-3 py-lg-4" href="/about">About</a></li>
-                    <!-- <li class="nav-item"><a class="nav-link px-lg-3 py-3 py-lg-4" href="/post">Sample Post</a></li> -->
+                    <li class="nav-item"><a class="nav-link px-lg-3 py-3 py-lg-4" href="/dashboard">Dashboard</a></li>
                     <li class="nav-item"><a class="nav-link px-lg-3 py-3 py-lg-4" href="/contact">Contact</a></li>
+
+                    <li class="nav-item">
+                        {% if 'user' in session %}
+                        <a class="nav-link px-lg-3 py-3 py-lg-4" href="/logout">
+                            <i class="fas fa-sign-out" style="color: red; height: 28px; width: 28px;"></i>
+                        </a>
+                        {% else %}
+                        <a class="nav-link px-lg-3 py-3 py-lg-4" href="/login">
+                            <i class="fas fa-sign-in" style="color: rgb(47, 191, 207); height: 28px; width: 28px;"></i>
+                        </a>
+                        {% endif %}
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link px-lg-3 py-3 py-lg-4" href="/register">
+                            <i class="fas fa-user-plus" style="color: rgb(12, 67, 184);height: 28px;width: 28px;"></i>
+                        </a>
+                    </li>
                 </ul>
             </div>
         </div>
     </nav>
 
 {% block body %} {% endblock %}
-
 
 <!-- Footer-->
 <footer class="border-top">
@@ -84,6 +105,14 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
 <!-- Core theme JS-->
 <script src="{{ url_for('static', filename='js/scripts.js')}}"></script>
+<script>
+    (function () {
+        window.history.pushState(null, null, window.location.href);
+        window.onpopstate = function () {
+            window.history.go(1);
+        };
+    })();
+</script>
 </body>
 
 </html>

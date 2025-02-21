@@ -9,18 +9,17 @@ with open('config.json','r') as c:
 
 local_server = True
 app = Flask(__name__)
-app.secret_key = 'secret-key'
+app.secret_key = 'secret-key'  # Required for session and flash messages
 app.config['UPLOAD_FOLDER'] = params['upload_location']
 
+# MySQL Configuration
 if(local_server):
     app.config['SQLALCHEMY_DATABASE_URI'] = params['local_url']
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = params['prod_url']
 
-
 db = SQLAlchemy(app) # initialize
-
 
 class Contacts(db.Model):
     '''sno name email ph_no msg date'''
@@ -40,40 +39,44 @@ class Posts(db.Model):
     date = db.Column(db.String(12), nullable = True)
     img_file = db.Column(db.String(12), nullable = True)
 
+class User(db.Model):
+    '''id name email password'''
+    id = db.Column(db.Integer,primary_key=True)
+    name = db.Column(db.String(50),nullable=False)
+    email = db.Column(db.String(50),unique=True)
+    password = db.Column(db.String(50),nullable=False)
+
 @app.route("/")
 def home():
-    flash("Welcome To Blog Post","info")
-    # Pagination Logic
+        flash("Welcome To Blog Post","info")
+        # Pagination Logic
 
-    # Fetching All Posts
-    posts = Posts.query.filter_by().all()  # [0:params['no_of_posts']]
+        # Fetching All Posts
+        posts = Posts.query.filter_by().all()  # [0:params['no_of_posts']]
 
-    # Calculating total number of pages:
-    last = math.ceil(len(posts)/int(params['no_of_posts']))
+        # Calculating total number of pages:
+        last = math.ceil(len(posts)/int(params['no_of_posts']))
 
-    # it’s important to get on what page user is.
-    page = request.args.get('page',1)
+        # it’s important to get on what page user is.
+        page = request.args.get('page',1)
 
-    # Ensure page is a valid integer
-    try:
-        page = int(page)
-    except ValueError:
-        page = 1  # Default to page 1 if not a valid number
-
-    posts=posts[(page-1)*int(params['no_of_posts']):(page-1)*int(params['no_of_posts']) + int(params['no_of_posts'])]
-
-    prev = f"/?page={page - 1}" if page > 1 else None
-    nxt = f"/?page={page + 1}" if page < last else None
-
-    return render_template('index.html',params = params,posts=posts,prev=prev,next=nxt)
+        # Ensure page is a valid integer
+        try:
+            page = int(page)
+        except ValueError:
+            page = 1  # Default to page 1 if not a valid number
+        posts=posts[(page-1)*int(params['no_of_posts']):(page-1)*int(params['no_of_posts']) + int(params['no_of_posts'])]
+        prev = f"/?page={page - 1}" if page > 1 else None
+        nxt = f"/?page={page + 1}" if page < last else None
+        return render_template('index.html',params = params,posts=posts,prev=prev,next=nxt)
 
 @app.route("/about")
 def about():
-    return render_template('about.html',params = params)
+        return render_template('about.html',params = params)
 
 @app.route("/edit/<string:sno>", methods=['GET', 'POST'])
 def edit(sno):
-    if 'user' in session and session['user'] == params['admin_user']:
+    if 'user' in session:
         if request.method == 'POST':
             box_title = request.form.get('title')
             box_slug = request.form.get('slug')
@@ -96,7 +99,6 @@ def edit(sno):
                 post.date = date
                 db.session.commit()
                 flash("Post Edit Success","success")
-
             return redirect('/dashboard')  # Redirect to dashboard instead of refreshing edit page
 
     post = None if sno == '0' else Posts.query.filter_by(sno=sno).first()
@@ -104,7 +106,7 @@ def edit(sno):
 
 @app.route("/uploader", methods=['GET', 'POST'])
 def uploader():
-    if 'user' in session and session['user'] == params['admin_user']:
+    if 'user' in session:
         if request.method == 'POST':
             f = request.files['file1']
             if f.filename == '':
@@ -116,51 +118,54 @@ def uploader():
             except Exception as e:
                 flash("File upload failed!", "danger")
             return redirect(request.url)
-
     return redirect("/dashboard")
 
 @app.route("/dashboard",methods = ['GET','POST'])
 def dashboard():
-    if ('user' in session and session['user'] == params['admin_user']):
+    if 'user' in session:
         posts = Posts.query.all()
         return render_template('dashboard.html',params = params,posts = posts)
 
     if request.method=='POST':
         username = request.form.get('username')
         userpass = request.form.get('password')
-        if (username == params['admin_user'] and userpass == params['admin_pass']):
+        if 'user' in session:
             # set the session variable , We want to set up session variable because we don’t want our user to login again and again, that would be too inconvenient.
             # To set up session variable, we first have to import session from flask. So, simply import it.
             session['user'] = username
             posts = Posts.query.all()
-            return render_template('dashboard.html',params = params,posts = posts)
-
+            response = render_template('dashboard.html', params=params, posts=posts)
+            response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+            response.headers['Pragma'] = 'no-cache'
+            return response
     # redirect to admin panel
     return render_template('login.html',params = params)
 
 @app.route("/post/<string:post_slug>",methods = ['GET'])
 def post_route(post_slug):
-    post = Posts.query.filter_by(slug=post_slug).first()
-    return render_template('post.html',params = params,post = post)
+    if 'user' in session:
+        post = Posts.query.filter_by(slug=post_slug).first()
+        return render_template('post.html',params = params,post = post)
+    else:
+        return render_template('login.html', params=params)
 
 @app.route("/contact", methods = ['GET','POST'])
 def contact():
-    if(request.method=='POST'):
-        '''Add entry to the database'''
-        name = request.form.get('name')
-        email = request.form.get('email')
-        phone = request.form.get('phone')
-        message = request.form.get('message')
-        entry = Contacts(name=name,email=email,ph_no=phone,msg=message,date=datetime.now())
-        db.session.add(entry)
-        db.session.commit()
-
-        flash("Thanks for send your details,We will get back to you soon","success")
-    return render_template('contact.html',params = params)
+        if(request.method=='POST'):
+            '''Add entry to the database'''
+            name = request.form.get('name')
+            email = request.form.get('email')
+            phone = request.form.get('phone')
+            message = request.form.get('message')
+            entry = Contacts(name=name,email=email,ph_no=phone,msg=message,date=datetime.now())
+            db.session.add(entry)
+            db.session.commit()
+            flash("Thanks for send your details,We will get back to you soon","success")
+        return render_template('contact.html',params = params)
 
 @app.route("/delete/<string:sno>",methods=['GET','POST'])
 def delete(sno):
-    if ('user' in session and session['user'] == params['admin_user']):
+    if 'user' in session:
         post = Posts.query.filter_by(sno=sno).first()
         db.session.delete(post)
         db.session.commit()
@@ -169,22 +174,50 @@ def delete(sno):
 
 @app.route('/logout')
 def logout():
-    session.pop('user')
-    return redirect('/dashboard')
+    session.pop('user', None)
+    flash("You have been logged out.", "info")
+    response = redirect('/')
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    return response
 
 
 # Make User Authentication
 
 @app.route('/register' , methods=['POST','GET'])
 def register():
+    if 'user' in session:
+        return redirect('/dashboard')
+
     if request.method=='POST':
-        pass
-    return render_template('register.html')
+        name = request.form['name']
+        email = request.form['email']
+        password = request.form['password']
+
+        # Save user to the database
+        new_user = User(name=name,email=email,password=password)
+        db.session.add(new_user)
+        db.session.commit()
+
+        flash('User registered successfully!', 'success')
+        return redirect('/login')
+    return render_template('register.html',params=params)
 
 @app.route('/login',methods=['GET','POST'])
 def login():
+    if 'user' in session:  # already logged in, redirect to dashboard
+        return redirect('/dashboard')
+
     if request.method=='POST':
-        pass
-    return render_template('login.html')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        user = User.query.filter_by(email=email).first()
+        if user and user.password==password:
+            session['user'] = user.id
+            flash('Login successful!', 'success')
+            return redirect('/')
+        else:
+            flash('Invalid Email or Password!', 'danger')
+    return render_template('login.html' ,params=params)
 
 app.run(debug=True)
