@@ -12,6 +12,14 @@ app = Flask(__name__)
 app.secret_key = 'secret-key'  # Required for session and flash messages
 app.config['UPLOAD_FOLDER'] = params['upload_location']
 
+
+
+
+
+
+
+
+
 # MySQL Configuration
 if(local_server):
     app.config['SQLALCHEMY_DATABASE_URI'] = params['local_url']
